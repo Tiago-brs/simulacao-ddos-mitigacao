@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard - Simulação DDoS</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { margin-top: 0; font-size: 22px; }
+  .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid #334155;
+  }
+  .card .label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+  .card .value { font-size: 28px; font-weight: bold; }
+
+  #status-card { grid-column: span 1; }
+  .status-ok { color: #4ade80; }
+  .status-attack { color: #f87171; }
+
+  .grid-lower {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 800px) {
+    .grid-lower { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid #334155;
+  }
+  .panel h2 { font-size: 15px; margin-top: 0; color: #cbd5e1; }
+
+  #blocked-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .ip-chip {
+    background: #7f1d1d;
+    color: #fecaca;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-family: monospace;
+  }
+
+  #log-list {
+    max-height: 280px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  #log-list div { border-bottom: 1px solid #334155; padding: 4px 0; }
+  #log-list div:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<h1>Dashboard de Monitoramento - Simulação DDoS</h1>
+<p class="subtitle">Atualiza automaticamente a cada 1 segundo</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="label">Requisições por segundo</div>
+    <div class="value" id="rps">0</div>
+  </div>
+  <div class="card">
+    <div class="label">Total de requisições</div>
+    <div class="value" id="total">0</div>
+  </div>
+  <div class="card">
+    <div class="label">IPs bloqueados</div>
+    <div class="value" id="blocked-count">0</div>
+  </div>
+  <div class="card" id="status-card">
+    <div class="label">Status da proteção</div>
+    <div class="value" id="status">Normal</div>
+  </div>
+</div>
+
+<div class="grid-lower">
+  <div class="panel">
+    <h2>Requisições por segundo (últimos 30s)</h2>
+    <canvas id="chart" height="120"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>IPs bloqueados</h2>
+    <div id="blocked-list"><span style="color:#64748b; font-size:13px;">Nenhum IP bloqueado</span></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top: 16px;">
+  <h2>Logs de eventos</h2>
+  <div id="log-list"><span style="color:#64748b; font-size:13px;">Nenhum evento registrado ainda</span></div>
+</div>
+
+<script>
+  const STATS_URL = 'http://localhost:3000/stats';
+
+  // ==== Gráfico de requisições por segundo ====
+  const ctx = document.getElementById('chart').getContext('2d');
+  const maxPoints = 30;
+  const chartData = {
+    labels: Array(maxPoints).fill(''),
+    datasets: [{
+      label: 'Req/s',
+      data: Array(maxPoints).fill(0),
+      borderColor: '#38bdf8',
+      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+    }]
+  };
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: chartData,
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+        x: { display: false }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  function pushChartPoint(value) {
+    chartData.datasets[0].data.push(value);
+    chartData.datasets[0].data.shift();
+    chart.update();
+  }
+
+  // ==== Atualização dos cards, IPs bloqueados e logs ====
+  async function updateDashboard() {
+    try {
+      const res = await fetch(STATS_URL);
+      const data = await res.json();
+
+      document.getElementById('rps').textContent = data.requestsPerSecond;
+      document.getElementById('total').textContent = data.totalRequests;
+      document.getElementById('blocked-count').textContent = data.blockedCount;
+
+      const statusEl = document.getElementById('status');
+      if (data.attackDetected) {
+        statusEl.textContent = 'Sob ataque';
+        statusEl.className = 'value status-attack';
+      } else {
+        statusEl.textContent = 'Normal';
+        statusEl.className = 'value status-ok';
+      }
+
+      const blockedListEl = document.getElementById('blocked-list');
+      if (data.blockedIps.length === 0) {
+        blockedListEl.innerHTML = '<span style="color:#64748b; font-size:13px;">Nenhum IP bloqueado</span>';
+      } else {
+        blockedListEl.innerHTML = data.blockedIps
+          .map(ip => `<span class="ip-chip">${ip}</span>`)
+          .join('');
+      }
+
+      const logListEl = document.getElementById('log-list');
+      if (data.events.length === 0) {
+        logListEl.innerHTML = '<span style="color:#64748b; font-size:13px;">Nenhum evento registrado ainda</span>';
+      } else {
+        logListEl.innerHTML = data.events.map(e => `<div>${e}</div>`).join('');
+      }
+
+      pushChartPoint(data.requestsPerSecond);
+    } catch (err) {
+      document.getElementById('status').textContent = 'Servidor offline';
+      document.getElementById('status').className = 'value status-attack';
+    }
+  }
+
+  updateDashboard();
+  setInterval(updateDashboard, 1000);
+</script>
+
+</body>
+</html>
