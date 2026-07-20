@@ -8,6 +8,14 @@ const { blacklistMiddleware, rateLimiterMiddleware, getMitigationStats } = requi
 const app = express();
 const PORT = 3000;
 
+// ==== CORS ====
+// Permite que o dashboard.html (aberto como arquivo local, origem "null")
+// consiga fazer fetch() nesta API sem ser bloqueado pelo navegador.
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+});
+
 // ==== CONTADORES GLOBAIS (do servidor, não da mitigação) ====
 let totalRequests = 0;
 let requestsThisSecond = 0;
