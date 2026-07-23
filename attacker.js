@@ -81,7 +81,7 @@ async function runAttack() {
 
   console.log(`Ataque concluído em ${elapsedSeconds}s`);
   console.log(`Total de requisições enviadas: ${flatResults.length}`);
-  console.log('Resumo por status:', summary);
+  console.log('Resumo por status:', summary); // retorna quantas respostas http teve de cada tipo que recebeu
   console.log('  200 = aceita | 429 = bloqueada pelo rate limiter | 403 = IP já banido');
 }
 
