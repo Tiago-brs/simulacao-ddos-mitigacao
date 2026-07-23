@@ -21,10 +21,10 @@ count_bloqueios = 0
 LIMITE_LOG = 100
 def log_eventos(message: str):
     horario = datetime.now().strftime("%H:%M:%S")
-    eventos.insert(0, f"[{horario}] {message}")
+    eventos.append(f"[{horario}] {message}")    # adicona ao final da lista
 
     if len(eventos) > LIMITE_LOG:   # deleta o ultimo item do log caso chegue no limite
-        eventos.pop()
+        eventos.pop(0)
 
 # extrai o IP da rquisição
 # usando header "X-Forwarded-For" pra simular múltiplos IPs vindos do attacker, 
@@ -99,5 +99,5 @@ def get_status_mitigacao():
         "blockedIps": list(blacklist.keys()),
         "blockedCount": count_bloqueios,
         "attackDetected": len(blacklist) > 0,
-        "events": eventos[:LIMITE_LOG] # últimos 20 eventos
+        "events": eventos[-LIMITE_LOG:] # últimos 20 eventos
     }

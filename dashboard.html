@@ -191,6 +191,9 @@
         logListEl.innerHTML = '<span style="color:#64748b; font-size:13px;">Nenhum evento registrado ainda</span>';
       } else {
         logListEl.innerHTML = data.events.map(e => `<div>${e}</div>`).join('');
+
+        // adiciona autoscroll na lista de log
+        logListEl.scrollTop = logListEl.scrollHeight;
       }
 
       pushChartPoint(data.requestsPerSecond);
