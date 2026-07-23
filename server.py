@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 
-from mitigation import blacklist_check, rate_limiter_check, get_status_mitigacao
+from mitigation import checar_blacklist, checar_rate_limiter, get_status_mitigacao
 
 # contadores globais do servidor
 total_requisicoes = 0
@@ -52,14 +52,14 @@ async def dependencia_logger():
 
 # usa depends pra fazer a contagem  de requisições, que roda antes da requisição em si
 # além de também fazer as verificações de mitigação
-@app.get("/", dependencies=[Depends(blacklist_check), Depends(rate_limiter_check), Depends(dependencia_logger)])
+@app.get("/", dependencies=[Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_logger)])
 async def raiz():
     return {"message": "Requisição processada com sucesso"}
 
 # rota de estaticas para usar no dashboard
 @app.get("/stats")
 async def status():
-    status_mitigacao = get_status_mitigacao
+    status_mitigacao = get_status_mitigacao()
 
     return {
         "totalRequests": total_requisicoes,
