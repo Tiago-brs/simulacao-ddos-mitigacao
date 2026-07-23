@@ -72,7 +72,7 @@ async def checar_rate_limiter(request: Request):
 
     log_requisicoes[ip].append(hora_atual)
 
-    if len(log_requisicoes[ip] > REQUISICOES_MAX_RATE_LIMITING):
+    if len(log_requisicoes[ip]) > REQUISICOES_MAX_RATE_LIMITING:
         # bloqueia o ip se exceder o limite de requisições
         blacklist[ip] = hora_atual + DURACAO_BLACKLIST_MS
         count_bloqueios += 1
@@ -85,6 +85,16 @@ async def checar_rate_limiter(request: Request):
 
 # função auxiliar para montar as respostas de /stats
 def get_status_mitigacao():
+    hora_atual = time.time() * 1000 # converte o tempo para milisegundos
+
+    # lista os ips que ja passaram do tempo de expiração
+    ips_expirados = [ip for ip, expira_em in blacklist.items() if hora_atual >= expira_em]
+
+    # limpa a blacklist antes de mandar os dados pro dashboard
+    for ip in ips_expirados:
+        del blacklist[ip]
+        log_eventos(f"IP {ip} desbloqueado (tempo expirado)")
+
     return {
         "blockedIps": list(blacklist.keys()),
         "blockedCount": count_bloqueios,

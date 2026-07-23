@@ -52,7 +52,7 @@ async def dependencia_logger():
 
 # usa depends pra fazer a contagem  de requisições, que roda antes da requisição em si
 # além de também fazer as verificações de mitigação
-@app.get("/", dependencies=[Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_logger)])
+@app.get("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
 async def raiz():
     return {"message": "Requisição processada com sucesso"}
 
