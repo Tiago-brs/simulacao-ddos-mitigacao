@@ -15,6 +15,8 @@ Projeto acadêmico de Segurança Computacional.
 2. Ativar ambiente vitual python 
     - Windows: `.venv\Scripts\activate`
     - Linux: `source .venv/bin/activate`
+3. Baixar bibliotecas python necessarias:
+    - `pip install -r requirements.txt`
 3. Rodar servidor simulado: `python3 server,py`
 4. Abrir `dashboard.html` no navegador
 5. Em outro terminal, rode o ataque: `python3 attacker.py`
