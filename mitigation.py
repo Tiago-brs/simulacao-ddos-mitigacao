@@ -30,10 +30,17 @@ def log_eventos(message: str):
 # usando header "X-Forwarded-For" pra simular múltiplos IPs vindos do attacker, 
 # já que localmente todo mundo teria o mesmo IP real.
 def get_ip_cliente(request: Request):
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded
-    return request.client.host
+    ip_real = request.client.host
+
+    # se o sistema for windows, todas as requisições locais chegam como 127.0.0.1
+    # por conta disso é usado o header "X-Forwarded-For" pra simular varios atacantes
+    if ip_real == "127.0.0.1":
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded
+
+    # se for linux/mac, os pacotes vão com IPs reais. então retorna o IP real
+    return ip_real
 
 # dependencia blacklist 
 # verifica se o ip está bloqueado antes de continuar a requisição
