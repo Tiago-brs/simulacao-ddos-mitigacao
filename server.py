@@ -86,4 +86,4 @@ if __name__ == "__main__":
     import uvicorn
     print(f"Servidor rodando em http://localhost:{PORTA}")
     print(f"Estatísticas em http://localhost:{PORTA}/stats")
-    uvicorn.run("server:app", host="0.0.0.0", port=PORTA, reload=True)
+    uvicorn.run("server:app", host="0.0.0.0", port=PORTA, reload=True, limit_concurrency=150)
