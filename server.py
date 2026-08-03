@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
     task.cancel()   # após yield roda quando o servidor desliga
 
-# cria o app com lifespan 
+# cria o app com lifespan
 app = FastAPI(lifespan=lifespan)
 PORTA = 3000
 
@@ -48,13 +48,25 @@ async def dependencia_logger():
     total_requisicoes += 1
     requisicoes_segundo_atual += 1
 
-# ROTAS
+# ROTAS PARA TESTE DE ATAQUE
 
 # usa depends pra fazer a contagem  de requisições, que roda antes da requisição em si
 # além de também fazer as verificações de mitigação
 @app.get("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
-async def raiz():
+async def raiz_get():
     return {"message": "Requisição processada com sucesso"}
+
+# rota post para o ataque POST Flood
+@app.post("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+async def raiz_post(request: Request):
+    # força o servidor a ler o pyload JSON, simulando uma leitura real de uma requisição de login
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    return {"message": "POST processado com sucesso"}
+
 
 # rota de estaticas para usar no dashboard
 @app.get("/stats")
