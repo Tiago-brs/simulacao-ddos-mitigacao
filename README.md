@@ -17,6 +17,6 @@ Projeto acadêmico de Segurança Computacional.
     - Linux: `source .venv/bin/activate`
 3. Baixar bibliotecas python necessarias:
     - `pip install -r requirements.txt`
-4. Rodar servidor simulado: `python3 server,py`
+4. Rodar servidor simulado: `python3 server.py`
 5. Abrir `dashboard.html` no navegador
 6. Em outro terminal, rode o ataque: `python3 attacker.py`
