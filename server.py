@@ -14,7 +14,7 @@ requisicoes_ultimo_segundo = 0
 
 # histórico de tempo de resposta medido pelo "usuário fantasma"
 # guarda só os últimos N pontos, para o gráfico não crescer infinitamente
-LIMITE_HISTORICO_LATENCIA = 60
+LIMITE_HISTORICO_LATENCIA = 180
 historico_latencia = []  # cada item: {"timestamp": epoch_ms, "tempoRespostaMs": float, "sucesso": bool}
 
 # configuração da rota "pesada" - simula uma operação real de aplicação
@@ -130,6 +130,24 @@ async def buscar_produto(produto_id: int):
     resultado = sum(i * i for i in range(50_000))
 
     return {"produto_id": produto_id, "checksum": resultado}
+
+
+# versão POST da rota pesada - simula uma atualização de produto (ex: editar preço/estoque).
+# tem o mesmo custo de I/O e CPU da versão GET, mas soma o custo extra de ler o body JSON,
+# assim o POST Flood ataca algo com peso de verdade em vez de cair em 405
+@app.post("/produto/{produto_id}", dependencies=[Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+async def atualizar_produto(produto_id: int, request: Request):
+    # simula receber e validar um payload de atualização (custo extra de parsing)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+
+    # mesmo custo de I/O + CPU da rota GET, pra manter a comparação justa entre os ataques
+    await asyncio.sleep(0.05)
+    resultado = sum(i * i for i in range(50_000))
+
+    return {"produto_id": produto_id, "checksum": resultado, "atualizado": True}
 
 
 # endpoint que liga/desliga a mitigação em tempo real, usado pelo botão do dashboard

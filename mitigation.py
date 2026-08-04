@@ -6,9 +6,13 @@ from fastapi import Request, HTTPException, status
 
 # configurações das mitigações
 # janela rate limiting e duração blacklist em milisegundo
-JANELA_RATE_LIMITING_MS = 5000  # 5 segundos
-REQUISICOES_MAX_RATE_LIMITING = 10
+JANELA_RATE_LIMITING_MS = 3000  # 3 segundos (era 5000)
+REQUISICOES_MAX_RATE_LIMITING = 2  # era 10, depois 3
 DURACAO_BLACKLIST_MS = 30000    # 30 segundos
+
+# IP do usuário fantasma (instrumento de medição) - nunca deve ser bloqueado,
+# pois é ele quem mede o impacto do ataque, não faz parte do tráfego avaliado
+IP_USUARIO_FANTASMA = "127.0.0.1"
 
 # estados em memoria
 log_requisicoes = {}    # { ip: [timestamps das requisições recentes] }
@@ -61,6 +65,11 @@ async def checar_blacklist(request: Request):
         return
 
     ip = get_ip_cliente(request)
+
+    # usuário fantasma nunca é bloqueado - ele é o instrumento de medição, não o alvo do teste
+    if ip == IP_USUARIO_FANTASMA:
+        return
+
     # hora que o ip expira e sai da blacklist
     expira_em = blacklist.get(ip)
 
@@ -87,6 +96,11 @@ async def checar_rate_limiter(request: Request):
         return
 
     ip = get_ip_cliente(request)
+
+    # usuário fantasma nunca é bloqueado - ele é o instrumento de medição, não o alvo do teste
+    if ip == IP_USUARIO_FANTASMA:
+        return
+
     hora_atual = time.time() * 1000 # converte o tempo para milisegundos
 
     # salva o ip no log de requisições pela primeira vez
