@@ -134,6 +134,10 @@
     <div class="value" id="total">0</div>
   </div>
   <div class="card">
+    <div class="label">Requisições aceitas</div>
+    <div class="value" id="accepted">0</div>
+  </div>
+  <div class="card">
     <div class="label">Latência atual</div>
     <div class="value" id="latency-now">0<span style="font-size:15px; color:var(--text-muted);">ms</span></div>
   </div>
@@ -266,6 +270,7 @@
 
       document.getElementById('rps').textContent = data.requestsPerSecond;
       document.getElementById('total').textContent = data.totalRequests;
+      document.getElementById('accepted').textContent = data.acceptedRequests;
 
       const statusEl = document.getElementById('status');
       const statusCard = document.getElementById('status-card');
