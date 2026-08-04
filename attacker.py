@@ -7,6 +7,11 @@ import httpx
 import platform
 import random
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress
+from rich.table import Table
+
 # detecta se está rodando no windows
 IS_WINDOWS = platform.system() == "Windows"
 
@@ -20,13 +25,18 @@ PAYLOAD_POST = {
     "dados": "Olá!" * 2500  # envia 10000 caracteres
 }
 
+console = Console()
+
 
 def gerar_ip_simulado(client_index: int) -> str:
     return f"127.0.0.{client_index + 2}"
 
 # seção do menu CLI
 def menu_cli():
-    print("    Simulador de Ataque DDos - painel de controle")
+    console.print(Panel.fit(
+        "[bold cyan]Simulador de Ataque DDoS[/bold cyan]\n[dim]painel de controle[/dim]",
+        border_style="cyan"
+    ))
 
     # tipo de requisição do ataque
     tipo_ataque = input("Tipo de requisição do ataque (GET ou POST) flood [padrão: POST]: ").strip().upper()
@@ -118,13 +128,24 @@ async def simular_cliente_post(cliente_index: int, duracao_segundos: int) -> lis
 
     return resultados_list
 
+
+# barra de progresso visual, só pra dar feedback ao vivo enquanto o ataque roda
+# (não interfere na lógica do ataque, só acompanha o tempo em paralelo)
+async def barra_de_progresso(duracao_segundos: int):
+    with Progress() as progress:
+        task = progress.add_task("[red]Atacando...", total=duracao_segundos)
+        for _ in range(duracao_segundos):
+            await asyncio.sleep(1)
+            progress.update(task, advance=1)
+
+
 # execução do ataque
 async def rodar_ataque():
     # chama o CLI para definir o ataque
     tipo_ataque, num_clientes, duracao_atck = menu_cli()
 
-    print(f"Iniciando ataque simulado: {num_clientes} clientes durante {duracao_atck} segundos")
-    print(f"Alvo: {URL_BASE}/produto/{{id}}\n")
+    console.print(f"\n[bold]Iniciando ataque simulado:[/bold] {num_clientes} clientes durante {duracao_atck} segundos")
+    console.print(f"[dim]Alvo: {URL_BASE}/produto/{{id}}[/dim]\n")
 
     hora_inicio = time.time()
 
@@ -135,7 +156,11 @@ async def rodar_ataque():
     else:
         tasks = [simular_cliente_get(i, duracao_atck) for i in range(num_clientes)]
 
-    todos_resultados = await asyncio.gather(*tasks)
+    # roda os clientes do ataque e a barra de progresso ao mesmo tempo
+    _, todos_resultados = await asyncio.gather(
+        barra_de_progresso(duracao_atck),
+        asyncio.gather(*tasks)
+    )
 
     # comprime a lista de listas em uma única lista
     flat_results = [resultado for resultados_cliente in todos_resultados for resultado in resultados_cliente]
@@ -148,10 +173,23 @@ async def rodar_ataque():
         status = r["status"]
         sumario[status] = sumario.get(status, 0) + 1
 
-    print(f"Ataque do tipo {tipo_ataque} concluído em {segundos_passado}s")
-    print(f"Total de requisições enviadas: {len(flat_results)}")
-    print("Resumo por status:", sumario)
-    print("  200 = aceita | 429 = bloqueada pelo rate limiter | 403 = IP já banido")
+    console.print(f"\n[bold green]Ataque do tipo {tipo_ataque} concluído em {segundos_passado}s[/bold green]")
+    console.print(f"Total de requisições enviadas: {len(flat_results)}\n")
+
+    tabela = Table(title="Resumo por status")
+    tabela.add_column("Status", style="bold")
+    tabela.add_column("Quantidade", justify="right")
+    tabela.add_column("Significado")
+
+    tabela.add_row("200", str(sumario.get(200, 0)), "[green]Aceita[/green]")
+    tabela.add_row("429", str(sumario.get(429, 0)), "[yellow]Bloqueada pelo rate limiter[/yellow]")
+    tabela.add_row("403", str(sumario.get(403, 0)), "[red]IP já banido[/red]")
+
+    outros_status = {k: v for k, v in sumario.items() if k not in (200, 429, 403)}
+    for status, quantidade in outros_status.items():
+        tabela.add_row(str(status), str(quantidade), "[dim]outro[/dim]")
+
+    console.print(tabela)
 
 
 if __name__ == "__main__":
