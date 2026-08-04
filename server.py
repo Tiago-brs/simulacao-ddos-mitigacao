@@ -12,6 +12,11 @@ total_requisicoes = 0
 requisicoes_segundo_atual = 0
 requisicoes_ultimo_segundo = 0
 
+# contador de requisições aceitas: só soma quando a requisição passa por TODAS
+# as verificações de mitigação e chega até o handler de verdade. Serve pra
+# distinguir "quanto chegou no servidor" (total) de "quanto foi processado" (aceitas)
+requisicoes_aceitas = 0
+
 # histórico de tempo de resposta medido pelo "usuário fantasma"
 # guarda só os últimos N pontos, para o gráfico não crescer infinitamente
 LIMITE_HISTORICO_LATENCIA = 180
@@ -97,16 +102,22 @@ async def dependencia_logger():
     total_requisicoes += 1
     requisicoes_segundo_atual += 1
 
+# contador de requisições aceitas - roda por ÚLTIMO na lista de dependencies,
+# então só executa se checar_blacklist e checar_rate_limiter não bloquearem antes
+async def dependencia_aceita():
+    global requisicoes_aceitas
+    requisicoes_aceitas += 1
+
 # ROTAS PARA TESTE DE ATAQUE
 
 # usa depends pra fazer a contagem  de requisições, que roda antes da requisição em si
 # além de também fazer as verificações de mitigação
-@app.get("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+@app.get("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_aceita)])
 async def raiz_get():
     return {"message": "Requisição processada com sucesso"}
 
 # rota post para o ataque POST Flood
-@app.post("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+@app.post("/", dependencies=[ Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_aceita)])
 async def raiz_post(request: Request):
     # força o servidor a ler o pyload JSON, simulando uma leitura real de uma requisição de login
     try:
@@ -121,7 +132,7 @@ async def raiz_post(request: Request):
 # com consulta/processamento), diferente das rotas acima que respondem "de graça".
 # É essa rota que o usuário fantasma consulta continuamente, e é nela que o
 # impacto de um ataque aparece de verdade em tempo de resposta.
-@app.get("/produto/{produto_id}", dependencies=[Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+@app.get("/produto/{produto_id}", dependencies=[Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_aceita)])
 async def buscar_produto(produto_id: int):
     # simula espera de I/O, como uma consulta a banco de dados
     await asyncio.sleep(0.05)
@@ -135,7 +146,7 @@ async def buscar_produto(produto_id: int):
 # versão POST da rota pesada - simula uma atualização de produto (ex: editar preço/estoque).
 # tem o mesmo custo de I/O e CPU da versão GET, mas soma o custo extra de ler o body JSON,
 # assim o POST Flood ataca algo com peso de verdade em vez de cair em 405
-@app.post("/produto/{produto_id}", dependencies=[Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter)])
+@app.post("/produto/{produto_id}", dependencies=[Depends(dependencia_logger), Depends(checar_blacklist), Depends(checar_rate_limiter), Depends(dependencia_aceita)])
 async def atualizar_produto(produto_id: int, request: Request):
     # simula receber e validar um payload de atualização (custo extra de parsing)
     try:
@@ -165,6 +176,7 @@ async def status():
 
     return {
         "totalRequests": total_requisicoes,
+        "acceptedRequests": requisicoes_aceitas,
         "requestsPerSecond": requisicoes_ultimo_segundo,
         "latencyHistory": historico_latencia,
         **status_mitigacao
