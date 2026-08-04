@@ -5,6 +5,7 @@ import asyncio
 import time
 import httpx
 import platform
+import random
 
 # detecta se está rodando no windows
 IS_WINDOWS = platform.system() == "Windows"
@@ -12,11 +13,10 @@ IS_WINDOWS = platform.system() == "Windows"
 # configurações do ataque
 HOST_ALVO = "127.0.0.1" # mudado de "localhost para "127.0.0.1" para forçar o uso de ipv4
 PORTA_ALVO = 3000
-PATH_ALVO = "/"
-URL_ALVO = f"http://{HOST_ALVO}:{PORTA_ALVO}{PATH_ALVO}"
+URL_BASE = f"http://{HOST_ALVO}:{PORTA_ALVO}"
 
-NUM_CLIENTES = 15               # quantidade de ips simulados
-REQUISICOES_POR_CLIENTE = 20    # quantidade de requisições por ip
+NUM_CLIENTES = 25               # quantidade de ips simulados
+REQUISICOES_POR_CLIENTE = 40    # quantidade de requisições por ip
 TIPO_ATAQUE = "post_flood"
 
 PAYLOAD_POST = {
@@ -35,10 +35,12 @@ def gerar_ip_simulado(client_index: int) -> str:
 # para simular diversos ips diferentes de forma fácil (TALVEZ USAR OUTRO MÉTODO PARA MULTIPLOS IPS)
 async def mandar_requisicao_get(cliente: httpx.AsyncClient, ip_origem: str) -> dict:
     headers = {"X-Forwarded-For": ip_origem} if IS_WINDOWS else {}
+    # aponta pra rota pesada, com id aleatório, pra gerar custo real de processamento no servidor
+    url = f"{URL_BASE}/produto/{random.randint(1, 1000)}"
 
     # requisição limpa, que o servidor descobre o ip pelo pacote TCP
     try:    
-        response = await cliente.get(URL_ALVO, headers=headers)
+        response = await cliente.get(url, headers=headers)
         return {"ip": ip_origem, "status": response.status_code}
 
     except Exception as err:
@@ -70,10 +72,12 @@ async def simular_cliente_get(cliente_index: int) -> list:
 
 async def mandar_requisicao_post(cliente: httpx.AsyncClient, ip_origem: str) -> dict:
     headers = {"X-Forwarded-For": ip_origem} if IS_WINDOWS else {}
+    # mesma lógica do GET: aponta pra rota pesada, agora via POST (simula "atualização de produto")
+    url = f"{URL_BASE}/produto/{random.randint(1, 1000)}"
 
     try:    
         # Envia a requisição POST acompanhada do payload JSON
-        response = await cliente.post(URL_ALVO, json=PAYLOAD_POST, headers=headers)
+        response = await cliente.post(url, json=PAYLOAD_POST, headers=headers)
         return {"ip": ip_origem, "status": response.status_code}
 
     except Exception as err:
@@ -100,7 +104,7 @@ async def simular_cliente_post(cliente_index: int) -> list:
 # execução do ataque
 async def rodar_ataque():
     print(f"Iniciando ataque simulado: {NUM_CLIENTES} clientes x {REQUISICOES_POR_CLIENTE} requisições cada")
-    print(f"Alvo: {URL_ALVO}\n")
+    print(f"Alvo: {URL_BASE}/produto/{{id}}\n")
 
     hora_inicio = time.time()
 

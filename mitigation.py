@@ -6,9 +6,13 @@ from fastapi import Request, HTTPException, status
 
 # configurações das mitigações
 # janela rate limiting e duração blacklist em milisegundo
-JANELA_RATE_LIMITING_MS = 5000  # 5 segundos
-REQUISICOES_MAX_RATE_LIMITING = 10
+JANELA_RATE_LIMITING_MS = 3000  # 3 segundos (era 5000)
+REQUISICOES_MAX_RATE_LIMITING = 2  # era 10, depois 3
 DURACAO_BLACKLIST_MS = 30000    # 30 segundos
+
+# IP do usuário fantasma (instrumento de medição) - nunca deve ser bloqueado,
+# pois é ele quem mede o impacto do ataque, não faz parte do tráfego avaliado
+IP_USUARIO_FANTASMA = "127.0.0.1"
 
 # estados em memoria
 log_requisicoes = {}    # { ip: [timestamps das requisições recentes] }
@@ -16,6 +20,17 @@ blacklist = {}          # { ip: timestamp de quando o bloqueio expira }
 eventos = []            # histórico de eventos para o dashboard (log)
 
 count_bloqueios = 0
+
+# estado do "interruptor" de mitigação - controla se as defesas estão ativas
+# usado para comparar o comportamento do servidor com e sem mitigação, ao vivo
+mitigacao_ativa = True
+
+def alternar_mitigacao() -> bool:
+    """Inverte o estado da mitigação (liga/desliga) e retorna o novo estado."""
+    global mitigacao_ativa
+    mitigacao_ativa = not mitigacao_ativa
+    log_eventos(f"Mitigação {'ATIVADA' if mitigacao_ativa else 'DESATIVADA'} manualmente")
+    return mitigacao_ativa
 
 # adiciona os eventos ao log, com limite de mostrar os 100 ultimos
 LIMITE_LOG = 100
@@ -45,7 +60,16 @@ def get_ip_cliente(request: Request):
 # dependencia blacklist 
 # verifica se o ip está bloqueado antes de continuar a requisição
 async def checar_blacklist(request: Request):
+    # se a mitigação está desligada, não verifica blacklist - deixa tudo passar
+    if not mitigacao_ativa:
+        return
+
     ip = get_ip_cliente(request)
+
+    # usuário fantasma nunca é bloqueado - ele é o instrumento de medição, não o alvo do teste
+    if ip == IP_USUARIO_FANTASMA:
+        return
+
     # hora que o ip expira e sai da blacklist
     expira_em = blacklist.get(ip)
 
@@ -67,7 +91,16 @@ async def checar_blacklist(request: Request):
 async def checar_rate_limiter(request: Request):
     global count_bloqueios
 
+    # se a mitigação está desligada, não verifica rate limit - deixa tudo passar
+    if not mitigacao_ativa:
+        return
+
     ip = get_ip_cliente(request)
+
+    # usuário fantasma nunca é bloqueado - ele é o instrumento de medição, não o alvo do teste
+    if ip == IP_USUARIO_FANTASMA:
+        return
+
     hora_atual = time.time() * 1000 # converte o tempo para milisegundos
 
     # salva o ip no log de requisições pela primeira vez
@@ -106,5 +139,6 @@ def get_status_mitigacao():
         "blockedIps": list(blacklist.keys()),
         "blockedCount": count_bloqueios,
         "attackDetected": len(blacklist) > 0,
-        "events": eventos[-LIMITE_LOG:] # últimos 20 eventos
+        "events": eventos[-LIMITE_LOG:], # últimos 20 eventos
+        "mitigacaoAtiva": mitigacao_ativa
     }
